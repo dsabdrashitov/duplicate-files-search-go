@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 func check(err error) {
@@ -29,9 +30,20 @@ func main() {
 		b = append(b, buf[:n]...)
 	}
 
-	fmt.Println("Read:\n" + string(b))
+	content := string(b)
+	fmt.Println("Read:\n" + content)
 
-	n, err := f.Write([]byte("ok"))
+	_, err = f.Seek(1, 0)
+	check(err)
+	n, err := f.Write([]byte("ok\nk"))
 	check(err)
 	fmt.Println(n)
+
+	curPos := strings.Index(content, "$")
+	if curPos != -1 {
+		fmt.Printf("Cut %d bytes at the end of file.\n", len(content)-curPos)
+		check(f.Truncate(int64(curPos)))
+	} else {
+		fmt.Println("No @ in file, so keep it intact.")
+	}
 }
