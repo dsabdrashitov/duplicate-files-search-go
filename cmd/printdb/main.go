@@ -14,7 +14,7 @@ func main() {
 		panic(err)
 	}
 	defer f.Close()
-	s, err := f.Next()
+	s, err := f.Read()
 	if err != nil {
 		panic(err)
 	}

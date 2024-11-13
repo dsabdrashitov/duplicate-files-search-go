@@ -14,16 +14,16 @@ func Open(filename string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	var this *File = &File{file}
-	return this, nil
+	var result *File = &File{file}
+	return result, nil
 }
 
 var readBuffer []byte = make([]byte, 1024)
 
-func (this *File) Next() (string, error) {
+func (file *File) Read() (string, error) {
 	result := make([]byte, 1)
 	for {
-		n, err := this.Read(readBuffer)
+		n, err := file.File.Read(readBuffer)
 		if err != nil {
 			if err == io.EOF {
 				break
