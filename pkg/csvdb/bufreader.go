@@ -1,7 +1,6 @@
 package csvdb
 
 import (
-	"fmt"
 	"io"
 	"os"
 )
@@ -41,7 +40,7 @@ func (br *BufferedReader) Read() (byte, error) {
 			return 0, err
 		}
 		if pos != br.pos+int64(len(br.buf)) {
-			return 0, IOError{fmt.Sprintf("Wrong file offset: %d. Expected: %d.", pos, br.pos+int64(len(br.buf)))}
+			return 0, ErrorOffset{pos, br.pos + int64(len(br.buf))}
 		}
 		br.pos = pos
 		br.done = 0
@@ -57,7 +56,7 @@ func (br *BufferedReader) Read() (byte, error) {
 	case err != nil:
 		return 0, err
 	default:
-		return 0, IOError{"File refused to read without error"}
+		panic("File returned zero bytes without error")
 	}
 }
 

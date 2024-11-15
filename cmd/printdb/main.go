@@ -8,16 +8,6 @@ import (
 	"github.com/dsabdrashitov/duplicate-files-search-go/pkg/csvdb"
 )
 
-func trim(s string) string {
-	if len(s) > 0 && s[len(s)-1] == 0x0A {
-		s = s[:len(s)-1]
-	}
-	if len(s) > 0 && s[len(s)-1] == 0x0D {
-		s = s[:len(s)-1]
-	}
-	return s
-}
-
 func main() {
 	filename := "data/data.txt"
 	fmt.Printf("Open %q\n", filename)
@@ -26,20 +16,27 @@ func main() {
 		panic(err)
 	}
 	defer f.Close()
-	reader, err := csvdb.NewBufferedReader(f)
+	reader, err := csvdb.NewCSVReader(f)
 	if err != nil {
 		panic(err)
 	}
 	for {
-		offset0 := reader.Offset()
-		line, err := reader.ReadLine()
-		offset1 := reader.Offset()
-		fmt.Printf("Read line: '%s' from %d to %d\n", trim(line), offset0, offset1)
+		offset, a, err := reader.ReadRow()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			panic(err)
+			switch err.(type) {
+			case csvdb.ErrorFormat:
+				fmt.Printf("Error at %d: %v\n", offset, err)
+				continue
+			default:
+				panic(err)
+			}
+		}
+		fmt.Printf("At %d read line with size %d:\n", offset, len(a))
+		for i, t := range a {
+			fmt.Printf("%d: '%s'\n", i, t)
 		}
 	}
 	fmt.Println("done")
