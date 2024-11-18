@@ -21,12 +21,12 @@ func main() {
 		panic(err)
 	}
 	for {
-		offset, a, err := reader.ReadRow()
+		offset, a, err := reader.NextRow()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			switch err.(type) {
+			switch err {
 			case csvdb.ErrorFormat:
 				fmt.Printf("Error at %d: %v\n", offset, err)
 				continue

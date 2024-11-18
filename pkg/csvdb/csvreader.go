@@ -25,14 +25,106 @@ func NewCSVReader(file *os.File) (*CSVReader, error) {
 	return result, nil
 }
 
-func (r *CSVReader) ReadRow() (int64, []string, error) {
+func (r *CSVReader) nextToken() (empty bool, t string, eol bool, e error) {
+	result := make([]byte, 0)
+	quoted := false
+	quote := false
+	broken := false
+	qcr := false
+	for {
+		c, err := r.br.Read()
+		if err != nil {
+			switch {
+			case err != io.EOF:
+				return false, "", false, err
+			case broken:
+				return false, "", false, ErrorFormat
+			case qcr:
+				return false, "", false, ErrorFormat
+			case quote:
+				return false, string(result), true, nil
+			case quoted:
+				return false, "", false, ErrorFormat
+			case len(result) > 0:
+				return false, string(result), true, nil
+			default:
+				return false, "", false, io.EOF
+			}
+		}
+		if broken {
+			// in broken state skip all till new line
+			if c == NL {
+				return false, "", false, ErrorFormat
+			} else {
+				continue
+			}
+		}
+		if c == '"' && !quoted && len(result) == 0 {
+			quoted = true
+			continue
+		}
+		if quoted {
+			if quote {
+				switch {
+				case c == NL:
+					return false, string(result), true, nil
+				case qcr:
+					broken = true
+					continue
+				case c == CR:
+					qcr = true
+					continue
+				case c == ',':
+					return false, string(result), false, nil
+				case c == '"':
+					result = append(result, c)
+					quote = false
+					continue
+				default:
+					broken = true
+					continue
+				}
+			} else {
+				if c == '"' {
+					quote = true
+					continue
+				} else {
+					result = append(result, c)
+					continue
+				}
+			}
+		} else {
+			switch {
+			case c == ',':
+				return false, string(result), false, nil
+			case c == NL:
+				if len(result) > 0 && result[len(result)-1] == CR {
+					result = result[:len(result)-1]
+				}
+				if len(result) == 0 {
+					return true, "", true, nil
+				} else {
+					return false, string(result), true, nil
+				}
+			case c == '"':
+				broken = true
+				continue
+			default:
+				result = append(result, c)
+				continue
+			}
+		}
+	}
+}
+
+func (r *CSVReader) NextRow() (int64, []string, error) {
 	result := make([]string, 0)
 	var offset int64
 	for {
 		if len(result) == 0 {
 			offset = r.br.Offset()
 		}
-		empty, t, eol, err := r.readNext()
+		empty, t, eol, err := r.nextToken()
 		if err != nil {
 			return offset, nil, err
 		}
@@ -45,81 +137,5 @@ func (r *CSVReader) ReadRow() (int64, []string, error) {
 			}
 		}
 		result = append(result, t)
-	}
-}
-
-func (r *CSVReader) readNext() (empty bool, token string, eol bool, e error) {
-	buf := make([]byte, 0)
-	b, err := r.br.Read()
-	if err != nil {
-		return false, "", false, err
-	}
-	if b == '"' {
-		skippedCR := false
-		quote := false
-		for {
-			b, err = r.br.Read()
-			if err == io.EOF {
-				if quote {
-					return false, "", false, ErrorNoNewline
-				} else {
-					return false, "", false, ErrorNoQuote
-				}
-			}
-			if err != nil {
-				return false, "", false, err
-			}
-
-			if b == '"' {
-				if quote {
-					if skippedCR {
-						return false, "", false, ErrorNoNewline
-					}
-					buf = append(buf, b)
-					quote = false
-				} else {
-					quote = true
-				}
-			} else {
-				if quote {
-					if b == NL {
-						return false, string(buf), true, nil
-					}
-					if skippedCR {
-						return false, "", false, ErrorNoNewline
-					}
-					if b == CR {
-						skippedCR = true
-					} else if b == ',' {
-						return false, string(buf), false, nil
-					} else {
-						return false, "", false, ErrorNoComma
-					}
-				} else {
-					buf = append(buf, b)
-				}
-			}
-		}
-	} else {
-		for {
-			if b == ',' {
-				return len(buf) == 0, string(buf), false, nil
-			}
-			if b == 0x0A {
-				if len(buf) > 0 && buf[len(buf)-1] == 0x0D {
-					buf = buf[:len(buf)-1]
-				}
-				return len(buf) == 0, string(buf), true, nil
-			}
-			buf = append(buf, b)
-
-			b, err = r.br.Read()
-			if err == io.EOF {
-				return false, "", false, ErrorNoNewline
-			}
-			if err != nil {
-				return false, "", false, err
-			}
-		}
 	}
 }
