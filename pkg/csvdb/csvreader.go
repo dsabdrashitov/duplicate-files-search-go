@@ -3,6 +3,7 @@ package csvdb
 import (
 	"io"
 	"os"
+	"strings"
 )
 
 const (
@@ -138,4 +139,12 @@ func (r *CSVReader) NextRow() (int64, []string, error) {
 		}
 		result = append(result, t)
 	}
+}
+
+func escape(s string) string {
+	if !strings.Contains(s, ",") && !strings.Contains(s, "\x0A") && !strings.Contains(s, "\"") {
+		return s
+	}
+	s = "\"" + strings.ReplaceAll(s, "\"", "\"\"") + "\""
+	return s
 }
