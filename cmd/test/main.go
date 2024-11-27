@@ -10,7 +10,7 @@ func main() {
 	filename := "data/db.csv"
 	fmt.Printf("Open %v\n", filename)
 
-	db, err := csvdb.New(filename, 2)
+	db, err := csvdb.New(filename, csvdb.ColumnCountValidator{Count: 2})
 	if err != nil {
 		panic(err)
 	}

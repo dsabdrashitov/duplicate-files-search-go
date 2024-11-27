@@ -1,10 +1,13 @@
 package csvdb
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"os"
+)
+
+const (
+	addCommand    = ""
+	deleteCommand = "-"
 )
 
 type dbEntry struct {
@@ -12,24 +15,41 @@ type dbEntry struct {
 	vals []string
 }
 
-type DB struct {
-	fields int
-	file   *os.File
-	fsize  int64
-	m      map[string]dbEntry
-	msize  int64
+type RowValidator interface {
+	Sum(k string, v []string) string
+	Check(k string, v []string) bool
 }
 
-func New(filename string, fields int) (*DB, error) {
+type ColumnCountValidator struct {
+	Count int
+}
+
+func (validator ColumnCountValidator) Check(k string, v []string) bool {
+	return len(v) == validator.Count
+}
+
+func (validator ColumnCountValidator) Sum(k string, v []string) string {
+	return ""
+}
+
+type DB struct {
+	file      *os.File
+	validator RowValidator
+	fsize     int64
+	m         map[string]dbEntry
+	msize     int64
+}
+
+func New(filename string, validator RowValidator) (*DB, error) {
 	f, err := os.OpenFile(filename, os.O_CREATE, 0777)
 	if err != nil {
 		return nil, err
 	}
 	result := &DB{
-		fields: fields,
-		file:   f,
-		m:      make(map[string]dbEntry),
-		msize:  0,
+		file:      f,
+		validator: validator,
+		m:         make(map[string]dbEntry),
+		msize:     0,
 	}
 	reader, err := NewCSVReader(f)
 	if err != nil {
@@ -48,20 +68,24 @@ func New(filename string, fields int) (*DB, error) {
 			f.Close()
 			return nil, err
 		}
-		if len(line) != 1+1 && len(line) != 1+fields+1 {
+		if len(line) < 3 {
 			// ignore lines with broken format
 			continue
 		}
-		if len(line[len(line)-1]) != 0 {
-			// it's error, last column should be empty
-			continue
-		}
-		if len(line) == 2 {
-			// kill
-			result.unset(line[0])
-		} else {
-			// add
-			result.set(line[0], dbEntry{pos, line[1 : 1+fields]})
+		switch line[1] {
+		case addCommand:
+			k, v := line[0], line[2:len(line)-1]
+			if validator.Check(k, v) && validator.Sum(k, v) == line[len(line)-1] {
+				// add
+				result.set(line[0], dbEntry{pos, line[2 : len(line)-1]})
+			}
+		case deleteCommand:
+			if len(line) == 3 && validator.Sum(line[0], nil) == line[2] {
+				// delete
+				result.unset(line[0])
+			}
+		default:
+			// ignore lines with broken format
 		}
 	}
 	result.fsize = reader.br.Offset()
@@ -94,9 +118,6 @@ func (db *DB) Set(key string, vals []string) error {
 		}
 	} else {
 		// set
-		if len(vals) != db.fields {
-			return errors.New(fmt.Sprintf("%v fields received, %v expected", len(vals), db.fields))
-		}
 		existing, ok := db.m[key]
 		if ok && unchanged(vals, existing.vals) {
 			return nil
@@ -110,8 +131,12 @@ func (db *DB) Set(key string, vals []string) error {
 	return nil
 }
 
+func (db *DB) Flush() error {
+	return db.file.Sync()
+}
+
 func (db *DB) writeDelete(key string) error {
-	data := encode(key, nil)
+	data := encode(key, deleteCommand, nil, db.validator.Sum(key, nil))
 	n, err := db.file.Write(data)
 	db.fsize += int64(n)
 	if err != nil {
@@ -121,7 +146,7 @@ func (db *DB) writeDelete(key string) error {
 }
 
 func (db *DB) writeSet(key string, vals []string) (dbEntry, error) {
-	data := encode(key, vals)
+	data := encode(key, addCommand, vals, db.validator.Sum(key, vals))
 	cur, err := offset(db.file)
 	if err != nil {
 		return dbEntry{}, err
@@ -140,16 +165,16 @@ func (db *DB) writeSet(key string, vals []string) (dbEntry, error) {
 func (db *DB) set(key string, entry dbEntry) {
 	existing, ok := db.m[key]
 	if ok {
-		db.msize -= dataSize(key, existing.vals)
+		db.msize -= dataSize(key, existing.vals, db.validator.Sum(key, existing.vals))
 	}
-	db.msize += dataSize(key, entry.vals)
+	db.msize += dataSize(key, entry.vals, db.validator.Sum(key, entry.vals))
 	db.m[key] = entry
 }
 
 func (db *DB) unset(key string) {
 	entry, ok := db.m[key]
 	if ok {
-		db.msize -= dataSize(key, entry.vals)
+		db.msize -= dataSize(key, entry.vals, db.validator.Sum(key, entry.vals))
 		delete(db.m, key)
 	}
 }
@@ -166,20 +191,19 @@ func unchanged(updated []string, existing []string) bool {
 	return true
 }
 
-func dataSize(key string, vals []string) int64 {
-	return int64(len(encode(key, vals)))
+func dataSize(key string, vals []string, sum string) int64 {
+	return int64(len(encode(key, addCommand, vals, sum)))
 }
 
-func encode(key string, vals []string) []byte {
+func encode(key string, command string, vals []string, sum string) []byte {
 	result := make([]byte, 0)
 	result = append(result, []byte(escape(key))...)
-	result = append(result, []byte(",")...)
-	if vals != nil {
-		for _, v := range vals {
-			result = append(result, []byte(escape(v))...)
-			result = append(result, []byte(",")...)
-		}
+	result = append(result, []byte(","+command+",")...)
+	for _, v := range vals {
+		result = append(result, []byte(escape(v))...)
+		result = append(result, []byte(",")...)
 	}
+	result = append(result, []byte(escape(sum))...)
 	result = append(result, NL)
 	return result
 }
