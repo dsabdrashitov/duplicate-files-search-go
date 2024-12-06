@@ -3,6 +3,7 @@ package csvdb
 import (
 	"io"
 	"os"
+	"slices"
 )
 
 const (
@@ -127,6 +128,48 @@ func (db *DB) Set(key string, vals []string) error {
 			return err
 		}
 		db.set(key, entry)
+	}
+	return nil
+}
+
+func (db *DB) Keys() []string {
+	result := make([]string, len(db.m))
+	i := 0
+	for k := range db.m {
+		result[i] = k
+		i += 1
+	}
+	return result
+}
+
+func (db *DB) Rewrite() error {
+	if db.fsize < db.msize {
+		return ErrorFileTooSmall
+	}
+	eline := []byte(ErroneousRow)
+	db.file.Write(eline)
+	db.fsize = db.fsize + int64(len(eline))
+	for k, e := range db.m {
+		_, err := db.writeSet(k, e.vals)
+		if err != nil {
+			return err
+		}
+	}
+	if _, err := db.file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	db.fsize = 0
+	keys := db.Keys()
+	slices.Sort(keys)
+	for _, k := range keys {
+		vals := db.m[k].vals
+		db.unset(k)
+		if err := db.Set(k, vals); err != nil {
+			return err
+		}
+	}
+	if err := db.file.Truncate(db.fsize); err != nil {
+		return err
 	}
 	return nil
 }

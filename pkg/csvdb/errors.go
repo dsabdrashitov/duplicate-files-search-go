@@ -15,3 +15,5 @@ func (e ErrorOffset) Error() string {
 }
 
 var ErrorFormat = errors.New("CSV format violation")
+
+var ErrorFileTooSmall = errors.New("File is too small to contain data")
