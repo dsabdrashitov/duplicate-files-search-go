@@ -174,6 +174,14 @@ func (db *DB) Rewrite() error {
 	return nil
 }
 
+func (db *DB) Service() error {
+	if db.fsize > serviceMultiplier*db.msize {
+		return db.Rewrite()
+	} else {
+		return nil
+	}
+}
+
 func (db *DB) Flush() error {
 	return db.file.Sync()
 }

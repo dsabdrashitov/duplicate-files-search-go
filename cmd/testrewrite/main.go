@@ -37,9 +37,18 @@ func main() {
 	}
 
 	time0 = time.Now()
+	if err := db.Rewrite(); err != nil {
+		panic(err)
+	}
+	fmt.Printf("Rewrite0 took %v\n", time.Since(time0))
+
+	time0 = time.Now()
 	for range TESTSIZE {
 		last++
 		if err := db.Set("a", []string{"a", fmt.Sprint(last)}); err != nil {
+			panic(err)
+		}
+		if err := db.Service(); err != nil {
 			panic(err)
 		}
 	}

@@ -5,5 +5,6 @@ const (
 )
 
 const (
-	fileBufferSize = 512
+	fileBufferSize    = 512
+	serviceMultiplier = 3
 )
