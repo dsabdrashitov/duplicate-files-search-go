@@ -57,12 +57,14 @@ func New(filename string, validator RowValidator) (*DB, error) {
 		f.Close()
 		return nil, err
 	}
+	hasErrors := false
 	for {
 		pos, line, err := reader.NextRow()
 		if err == io.EOF {
 			break
 		}
 		if err == ErrorFormat {
+			hasErrors = true
 			continue
 		}
 		if err != nil {
@@ -70,6 +72,7 @@ func New(filename string, validator RowValidator) (*DB, error) {
 			return nil, err
 		}
 		if len(line) < 3 {
+			hasErrors = true
 			// ignore lines with broken format
 			continue
 		}
@@ -79,17 +82,30 @@ func New(filename string, validator RowValidator) (*DB, error) {
 			if validator.Check(k, v) && validator.Sum(k, v) == line[len(line)-1] {
 				// add
 				result.set(line[0], dbEntry{pos, line[2 : len(line)-1]})
+			} else {
+				hasErrors = true
 			}
 		case deleteCommand:
 			if len(line) == 3 && validator.Sum(line[0], nil) == line[2] {
 				// delete
 				result.unset(line[0])
+			} else {
+				hasErrors = true
 			}
 		default:
+			hasErrors = true
 			// ignore lines with broken format
 		}
 	}
 	result.fsize = reader.br.Offset()
+	if hasErrors {
+		// need to rewrite db with errors to prevent lost writes (acquired by last unclosed quote)
+		err := result.Rewrite()
+		if err != nil {
+			result.Close()
+			return nil, err
+		}
+	}
 	return result, nil
 }
 
