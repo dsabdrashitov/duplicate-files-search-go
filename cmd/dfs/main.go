@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	BP "github.com/dsabdrashitov/duplicate-files-search-go/internal/boilerplate"
+	bp "github.com/dsabdrashitov/duplicate-files-search-go/internal/boilerplate"
 	"github.com/dsabdrashitov/duplicate-files-search-go/internal/futil"
 	"github.com/dsabdrashitov/duplicate-files-search-go/pkg/csvdb"
 	"github.com/urfave/cli"
@@ -25,18 +25,18 @@ func initCommand(c *cli.Context) error {
 	} else {
 		p = "."
 	}
-	p = BP.Must(filepath.Abs(p))
-	if !BP.Must(futil.Exists(p)) {
+	p = bp.Must(filepath.Abs(p))
+	if !bp.Must(futil.Exists(p)) {
 		return fmt.Errorf("path '%v' not exists", p)
 	}
 	if !futil.IsDirectory(p) {
 		return fmt.Errorf("path '%v' is not directory", p)
 	}
 	f := filepath.Join(p, DbFile)
-	if BP.Must(futil.Exists(f)) {
+	if bp.Must(futil.Exists(f)) {
 		return fmt.Errorf("database at '%v' exists", f)
 	}
-	db := BP.Must(csvdb.New(f, csvdb.ColumnCountValidator{Count: 3}))
+	db := bp.Must(csvdb.New(f, csvdb.ColumnCountValidator{Count: 3}))
 	db.Service()
 	fmt.Printf("Database at '%v' initiated.\n", f)
 	return nil

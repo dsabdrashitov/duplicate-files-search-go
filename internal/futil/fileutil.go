@@ -3,7 +3,7 @@ package futil
 import (
 	"os"
 
-	BP "github.com/dsabdrashitov/duplicate-files-search-go/internal/boilerplate"
+	bp "github.com/dsabdrashitov/duplicate-files-search-go/internal/boilerplate"
 )
 
 func Exists(path string) (bool, error) {
@@ -18,7 +18,7 @@ func Exists(path string) (bool, error) {
 }
 
 func IsDirectory(path string) bool {
-	fileInfo := BP.Must(os.Stat(path))
+	fileInfo := bp.Must(os.Stat(path))
 	switch mode := fileInfo.Mode(); {
 	case mode.IsDir():
 		return true
@@ -28,7 +28,7 @@ func IsDirectory(path string) bool {
 }
 
 func IsFile(path string) bool {
-	fileInfo := BP.Must(os.Stat(path))
+	fileInfo := bp.Must(os.Stat(path))
 	switch mode := fileInfo.Mode(); {
 	case mode.IsRegular():
 		return true
