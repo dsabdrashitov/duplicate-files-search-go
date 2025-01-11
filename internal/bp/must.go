@@ -1,4 +1,4 @@
-package boilerplate
+package bp
 
 func Must[T any](val T, err error) T {
 	if err != nil {

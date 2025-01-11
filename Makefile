@@ -7,7 +7,7 @@ INTERNAL_DIR := ./internal
 CMD_PATHS := $(wildcard $(CMD_DIR)/*)
 BIN_LIST := $(patsubst $(CMD_DIR)/%,$(BIN_DIR)/%.exe,$(CMD_PATHS))
 
-SOURCES = $(wildcard $(PKG_DIR)/**/*.go) $(wildcards $(INTERNAL_DIR)/**/*.go) $(wildcard $(CMD_DIR)/**/*.go)
+SOURCES = $(wildcard $(PKG_DIR)/**/*.go) $(wildcard $(INTERNAL_DIR)/**/*.go) $(wildcard $(CMD_DIR)/**/*.go)
 
 all: $(BIN_LIST)
 

@@ -4,16 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	bp "github.com/dsabdrashitov/duplicate-files-search-go/internal/boilerplate"
-	"github.com/dsabdrashitov/duplicate-files-search-go/internal/futil"
-	"github.com/dsabdrashitov/duplicate-files-search-go/pkg/csvdb"
-)
-
-const (
-	DbFile = ".dfsdb"
-	DFS    = "dfs"
+	"github.com/dsabdrashitov/duplicate-files-search-go/internal/bp"
+	"github.com/dsabdrashitov/duplicate-files-search-go/internal/constants"
+	"github.com/dsabdrashitov/duplicate-files-search-go/internal/subcommands"
 )
 
 func subcommandInit(args []string) error {
@@ -30,27 +24,27 @@ func subcommandInit(args []string) error {
 	default:
 		return fmt.Errorf("too many arguments (%v); DB directory expected", len(tail))
 	}
-	p = bp.Must(filepath.Abs(p))
-	if !bp.Must(futil.Exists(p)) {
-		return fmt.Errorf("path '%v' not exists", p)
-	}
-	if !bp.Must(futil.IsDirectory(p)) {
-		return fmt.Errorf("path '%v' is not directory", p)
-	}
-	f := filepath.Join(p, DbFile)
-	if bp.Must(futil.Exists(f)) {
-		return fmt.Errorf("database at '%v' exists", f)
-	}
-	db := bp.Must(csvdb.New(f, csvdb.ColumnCountValidator{Count: 3}))
-	db.Service()
-	fmt.Printf("Database at '%v' initiated.\n", f)
-	return nil
+	return subcommands.Init(p)
 }
 
 func subcommandScan(args []string) error {
-	fmt.Println(args)
-	fmt.Println("scan!!!")
-	return nil
+	fs := flag.NewFlagSet("scan", flag.ExitOnError)
+	var db string
+	fs.StringVar(&db, "db", "", "path to db file")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if db == "" {
+		var err error
+		if db, err = findNearestDb(); err != nil {
+			return err
+		}
+	}
+	tail := fs.Args()
+	if len(tail) == 0 {
+		return fmt.Errorf("no paths to scan provided")
+	}
+	return subcommands.ScanPaths(db, tail)
 }
 
 func subcommandHelp(args []string) error {
@@ -59,15 +53,15 @@ func subcommandHelp(args []string) error {
 
 func processSubcommand(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("subcommand expected; try '%v help'", DFS)
+		return fmt.Errorf("subcommand expected; try '%v help'", constants.DFS)
 	}
 	switch args[0] {
 	case "init":
 		return subcommandInit(args[1:])
 	case "scan":
-		return subcommandScan(os.Args[1:])
+		return subcommandScan(args[1:])
 	case "help":
-		return subcommandHelp(os.Args[1:])
+		return subcommandHelp(args[1:])
 	default:
 		return fmt.Errorf("unknown subcommand '%v'", args[0])
 	}
