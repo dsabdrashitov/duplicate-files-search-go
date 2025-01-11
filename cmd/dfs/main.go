@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,28 +9,32 @@ import (
 	bp "github.com/dsabdrashitov/duplicate-files-search-go/internal/boilerplate"
 	"github.com/dsabdrashitov/duplicate-files-search-go/internal/futil"
 	"github.com/dsabdrashitov/duplicate-files-search-go/pkg/csvdb"
-	"github.com/urfave/cli"
 )
 
 const (
 	DbFile = ".dfsdb"
+	DFS    = "dfs"
 )
 
-func initCommand(c *cli.Context) error {
-	if len(c.Args().Tail()) != 0 {
-		return fmt.Errorf("%v extra arguments", len(c.Args().Tail()))
-	}
+func subcommandInit(args []string) error {
+	fs := flag.NewFlagSet("init", flag.ExitOnError)
+	fs.Parse(args)
+	tail := fs.Args()
 	var p string
-	if c.Args().Present() {
-		p = c.Args().First()
-	} else {
-		p = "."
+	switch len(tail) {
+	case 0:
+		p = bp.Must(os.Getwd())
+		fmt.Printf("No directory provided. Use current: %v.\n", p)
+	case 1:
+		p = tail[0]
+	default:
+		return fmt.Errorf("too many arguments (%v); DB directory expected", len(tail))
 	}
 	p = bp.Must(filepath.Abs(p))
 	if !bp.Must(futil.Exists(p)) {
 		return fmt.Errorf("path '%v' not exists", p)
 	}
-	if !futil.IsDirectory(p) {
+	if !bp.Must(futil.IsDirectory(p)) {
 		return fmt.Errorf("path '%v' is not directory", p)
 	}
 	f := filepath.Join(p, DbFile)
@@ -42,29 +47,35 @@ func initCommand(c *cli.Context) error {
 	return nil
 }
 
-func scanCommand(c *cli.Context) error {
-	fmt.Println(c.Args())
+func subcommandScan(args []string) error {
+	fmt.Println(args)
 	fmt.Println("scan!!!")
 	return nil
 }
 
-func main() {
-	app := cli.NewApp()
-	app.Name = "dfs"
-	app.Description = "Tool for collecting hashes of files."
-	app.Commands = []cli.Command{
-		{
-			Name:   "init",
-			Usage:  "Create new empty database, if none.",
-			Action: initCommand,
-		},
-		{
-			Name:   "scan",
-			Usage:  "Scan specified path.",
-			Action: scanCommand,
-		},
+func subcommandHelp(args []string) error {
+	panic("unimplemented")
+}
+
+func processSubcommand(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("subcommand expected; try '%v help'", DFS)
 	}
-	if err := app.Run(os.Args); err != nil {
-		panic(err)
+	switch args[0] {
+	case "init":
+		return subcommandInit(args[1:])
+	case "scan":
+		return subcommandScan(os.Args[1:])
+	case "help":
+		return subcommandHelp(os.Args[1:])
+	default:
+		return fmt.Errorf("unknown subcommand '%v'", args[0])
+	}
+}
+
+func main() {
+	if err := processSubcommand(os.Args[1:]); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

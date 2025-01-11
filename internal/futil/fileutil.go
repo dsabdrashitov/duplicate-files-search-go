@@ -2,8 +2,6 @@ package futil
 
 import (
 	"os"
-
-	bp "github.com/dsabdrashitov/duplicate-files-search-go/internal/boilerplate"
 )
 
 func Exists(path string) (bool, error) {
@@ -17,22 +15,28 @@ func Exists(path string) (bool, error) {
 	return false, err
 }
 
-func IsDirectory(path string) bool {
-	fileInfo := bp.Must(os.Stat(path))
+func IsDirectory(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
 	switch mode := fileInfo.Mode(); {
 	case mode.IsDir():
-		return true
+		return true, nil
 	default:
-		return false
+		return false, nil
 	}
 }
 
-func IsFile(path string) bool {
-	fileInfo := bp.Must(os.Stat(path))
+func IsFile(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
 	switch mode := fileInfo.Mode(); {
 	case mode.IsRegular():
-		return true
+		return true, nil
 	default:
-		return false
+		return false, nil
 	}
 }
